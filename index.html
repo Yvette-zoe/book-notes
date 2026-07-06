@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+<title>书摘 · 记录与管理</title>
+
+<!-- PWA：支持「添加到主屏幕」，获得类 App 图标与全屏体验 -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#F6F2E9" />
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="书摘" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ============ 首页：记录 ============ -->
+  <main class="view view-home" data-view="home">
+    <header class="home-header">
+      <p class="home-date" id="homeDate">7 月 6 日</p>
+      <h1 class="home-title">此刻，写下一段文字</h1>
+    </header>
+
+    <section class="composer">
+      <div class="type-toggle" role="tablist" aria-label="记录类型">
+        <button class="type-pill is-active" data-type="excerpt" role="tab" aria-selected="true">摘抄</button>
+        <button class="type-pill" data-type="thought" role="tab" aria-selected="false">感想</button>
+      </div>
+
+      <textarea
+        id="contentInput"
+        class="composer-input"
+        placeholder="摘录喜欢的文字，或写下此刻的感受……"
+        rows="8"
+        maxlength="2000"
+      ></textarea>
+
+      <div class="composer-footer">
+        <span class="char-count" id="charCount">0 / 2000</span>
+        <button class="save-btn" id="saveBtn" disabled>
+          <span>记 录</span>
+        </button>
+      </div>
+    </section>
+
+    <p class="toast" id="toast">已记录</p>
+  </main>
+
+  <!-- ============ 总览页 ============ -->
+  <main class="view view-overview" data-view="overview" hidden>
+    <header class="overview-header">
+      <h1 class="page-title">总览</h1>
+
+      <div class="stats-row">
+        <div class="stat-block">
+          <span class="stat-number" id="statDays">0</span>
+          <span class="stat-label">记录天数</span>
+        </div>
+        <div class="stat-block">
+          <span class="stat-number" id="statTotal">0</span>
+          <span class="stat-label">书摘总数</span>
+        </div>
+      </div>
+      <p class="stats-breakdown">
+        摘抄 <b id="statExcerpt">0</b> · 感想 <b id="statThought">0</b>
+      </p>
+    </header>
+
+    <div class="mode-switch" role="tablist" aria-label="查看方式">
+      <button class="mode-pill is-active" data-mode="time" role="tab" aria-selected="true">按时间</button>
+      <button class="mode-pill" data-mode="type" role="tab" aria-selected="false">按类型</button>
+    </div>
+
+    <section class="entry-list" id="entryList">
+      <!-- 动态渲染 -->
+    </section>
+
+    <div class="empty-state" id="emptyState" hidden>
+      <p class="empty-title">尚无记录</p>
+      <p class="empty-desc">回到「记录」页写下第一段文字吧</p>
+    </div>
+  </main>
+
+  <!-- ============ 底部导航 ============ -->
+  <nav class="tab-bar">
+    <button class="tab-item is-active" data-target="home">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none"><path d="M4 12.5L12 5l8 7.5M6 10.5V19a1 1 0 0 0 1 1h3v-5h4v5h3a1 1 0 0 0 1-1v-8.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>记录</span>
+    </button>
+    <button class="tab-item" data-target="overview">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.4"/><rect x="13" y="4" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="13" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.4"/><rect x="13" y="13" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.4"/></svg>
+      <span>总览</span>
+    </button>
+  </nav>
+
+  <!-- ============ 编辑弹层 ============ -->
+  <div class="sheet-overlay" id="sheetOverlay" hidden>
+    <div class="sheet" id="sheet">
+      <div class="sheet-handle"></div>
+      <div class="type-toggle" role="tablist" aria-label="编辑类型">
+        <button class="type-pill" data-edit-type="excerpt" role="tab">摘抄</button>
+        <button class="type-pill" data-edit-type="thought" role="tab">感想</button>
+      </div>
+      <textarea id="editInput" class="composer-input sheet-textarea" rows="8" maxlength="2000"></textarea>
+      <p class="sheet-meta" id="editMeta"></p>
+      <div class="sheet-actions">
+        <button class="ghost-btn" id="deleteBtn">删除</button>
+        <div class="sheet-actions-right">
+          <button class="ghost-btn" id="cancelBtn">取消</button>
+          <button class="save-btn" id="updateBtn">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="js/app.js"></script>
+<script>
+  // 注册 Service Worker：使应用支持离线访问与「添加到主屏幕」安装
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch((err) => {
+        console.warn('Service Worker 注册失败：', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
