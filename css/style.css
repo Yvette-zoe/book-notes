@@ -226,14 +226,45 @@ button, textarea, input {
 
 .overview-header { margin-bottom: 22px; }
 
+.overview-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
 .page-title {
   font-size: 15px;
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--color-ink-faint);
-  margin: 0 0 22px;
+  margin: 0;
   font-weight: 500;
 }
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-family: var(--font-serif-cn);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.export-btn:active { background: var(--color-surface-hover); }
+
+.export-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.export-icon { width: 14px; height: 14px; }
 
 .stats-row {
   display: flex;

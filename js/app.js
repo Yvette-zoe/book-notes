@@ -157,6 +157,7 @@
     statTotal: $('#statTotal'),
     statExcerpt: $('#statExcerpt'),
     statThought: $('#statThought'),
+    exportBtn: $('#exportBtn'),
     modeSwitch: $('.mode-switch'),
     entryList: $('#entryList'),
     emptyState: $('#emptyState'),
@@ -239,6 +240,7 @@
     els.statTotal.textContent = s.total;
     els.statExcerpt.textContent = s.excerpt;
     els.statThought.textContent = s.thought;
+    els.exportBtn.disabled = s.total === 0;
   }
 
   els.modeSwitch.addEventListener('click', (e) => {
@@ -252,6 +254,70 @@
     });
     renderEntryList();
   });
+
+  /* ============ 总览页：导出 CSV ============ */
+
+  /** CSV 字段转义：包含逗号/引号/换行时需要用双引号包裹，内部双引号转义为两个双引号 */
+  function csvEscape(value) {
+    const str = String(value ?? '');
+    if (/[",\r\n]/.test(str)) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  }
+
+  /** 生成 CSV 文本：日期采用 MM/DD/YYYY，便于导入 Notion 等工具时被识别为日期属性 */
+  function buildCsv(list) {
+    const header = ['内容', '分类', '日期', '时间', 'ID'];
+    const sorted = list.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    const rows = sorted.map((entry) => {
+      const date = new Date(entry.createdAt);
+      const dateStr = `${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}/${date.getFullYear()}`;
+      return [entry.content, TYPE_LABEL[entry.type], dateStr, timeOf(date), entry.id]
+        .map(csvEscape)
+        .join(',');
+    });
+
+    return [header.join(','), ...rows].join('\r\n');
+  }
+
+  async function exportCsv() {
+    const list = Store.all();
+    if (list.length === 0) return;
+
+    const now = new Date();
+    const filename = `书摘导出_${dateKeyOf(now)}.csv`;
+    const csvText = '\uFEFF' + buildCsv(list); // 加 BOM，避免 Excel 等工具打开时中文乱码
+    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+
+    // 移动端优先走系统分享面板，可直接"存储到文件/发送给其他App"，体验优于静默下载
+    if (navigator.canShare) {
+      try {
+        const file = new File([blob], filename, { type: 'text/csv' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: filename });
+          showToast('已导出');
+          return;
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // 用户主动取消分享，不再兜底下载
+      }
+    }
+
+    // 兜底方案：直接触发浏览器下载
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('已导出');
+  }
+
+  els.exportBtn.addEventListener('click', exportCsv);
 
   /* ============ 总览页：列表渲染 ============ */
 
