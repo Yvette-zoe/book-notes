@@ -158,6 +158,8 @@
     statExcerpt: $('#statExcerpt'),
     statThought: $('#statThought'),
     exportBtn: $('#exportBtn'),
+    exportMenu: $('#exportMenu'),
+    exportDropdown: $('#exportDropdown'),
     modeSwitch: $('.mode-switch'),
     entryList: $('#entryList'),
     emptyState: $('#emptyState'),
@@ -241,6 +243,7 @@
     els.statExcerpt.textContent = s.excerpt;
     els.statThought.textContent = s.thought;
     els.exportBtn.disabled = s.total === 0;
+    if (s.total === 0) closeExportMenu();
   }
 
   els.modeSwitch.addEventListener('click', (e) => {
@@ -255,7 +258,7 @@
     renderEntryList();
   });
 
-  /* ============ 总览页：导出 CSV ============ */
+  /* ============ 总览页：导出（CSV / Markdown） ============ */
 
   /** CSV 字段转义：包含逗号/引号/换行时需要用双引号包裹，内部双引号转义为两个双引号 */
   function csvEscape(value) {
@@ -282,19 +285,87 @@
     return [header.join(','), ...rows].join('\r\n');
   }
 
-  async function exportCsv() {
-    const list = Store.all();
-    if (list.length === 0) return;
-
+  /** 生成 Obsidian 友好的 Markdown：YAML frontmatter + 按日期分组，摘抄用引用块 */
+  function buildMarkdown(list) {
     const now = new Date();
-    const filename = `书摘导出_${dateKeyOf(now)}.csv`;
-    const csvText = '\uFEFF' + buildCsv(list); // 加 BOM，避免 Excel 等工具打开时中文乱码
-    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+    const sorted = list.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const groups = new Map();
 
-    // 移动端优先走系统分享面板，可直接"存储到文件/发送给其他App"，体验优于静默下载
+    sorted.forEach((entry) => {
+      const key = dateKeyOf(new Date(entry.createdAt));
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(entry);
+    });
+
+    const lines = [
+      '---',
+      'title: 书摘记录',
+      `exported: ${dateKeyOf(now)}`,
+      'source: 书摘助手',
+      'tags:',
+      '  - 书摘',
+      '---',
+      '',
+      '# 书摘记录',
+      '',
+      `共 ${list.length} 条 · 导出于 ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`,
+      '',
+    ];
+
+    Array.from(groups.keys()).forEach((key) => {
+      const [y, m, d] = key.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      lines.push(`## ${key} · ${WEEKDAY_LABEL[date.getDay()]}`);
+      lines.push('');
+
+      groups.get(key).forEach((entry) => {
+        const created = new Date(entry.createdAt);
+        const label = TYPE_LABEL[entry.type];
+        lines.push(`### ${label} · ${timeOf(created)}`);
+        lines.push('');
+        if (entry.type === 'excerpt') {
+          // 摘抄用引用块，更符合 Obsidian 阅读习惯
+          entry.content.split(/\r?\n/).forEach((line) => {
+            lines.push(`> ${line}`);
+          });
+        } else {
+          lines.push(entry.content);
+        }
+        lines.push('');
+        lines.push(`^${entry.id}`);
+        lines.push('');
+      });
+    });
+
+    return lines.join('\n').trim() + '\n';
+  }
+
+  /** 关闭导出下拉菜单 */
+  function closeExportMenu() {
+    els.exportDropdown.hidden = true;
+    els.exportBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  /** 打开/关闭导出下拉菜单 */
+  function toggleExportMenu() {
+    if (els.exportBtn.disabled) return;
+    const willOpen = els.exportDropdown.hidden;
+    els.exportDropdown.hidden = !willOpen;
+    els.exportBtn.setAttribute('aria-expanded', String(willOpen));
+  }
+
+  /**
+   * 通用导出：优先走系统分享面板，失败则触发浏览器下载
+   * @param {string} filename 文件名
+   * @param {string} content 文件内容
+   * @param {string} mimeType MIME 类型
+   */
+  async function shareOrDownload(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+
     if (navigator.canShare) {
       try {
-        const file = new File([blob], filename, { type: 'text/csv' });
+        const file = new File([blob], filename, { type: mimeType });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: filename });
           showToast('已导出');
@@ -305,7 +376,6 @@
       }
     }
 
-    // 兜底方案：直接触发浏览器下载
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -317,7 +387,46 @@
     showToast('已导出');
   }
 
-  els.exportBtn.addEventListener('click', exportCsv);
+  async function exportAs(format) {
+    const list = Store.all();
+    if (list.length === 0) return;
+
+    const stamp = dateKeyOf(new Date());
+    closeExportMenu();
+
+    if (format === 'csv') {
+      await shareOrDownload(
+        `书摘导出_${stamp}.csv`,
+        '\uFEFF' + buildCsv(list), // 加 BOM，避免 Excel 等工具打开时中文乱码
+        'text/csv;charset=utf-8;'
+      );
+      return;
+    }
+
+    if (format === 'markdown') {
+      await shareOrDownload(
+        `书摘导出_${stamp}.md`,
+        buildMarkdown(list),
+        'text/markdown;charset=utf-8;'
+      );
+    }
+  }
+
+  els.exportBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleExportMenu();
+  });
+
+  els.exportDropdown.addEventListener('click', (e) => {
+    const option = e.target.closest('.export-option');
+    if (!option) return;
+    exportAs(option.dataset.format);
+  });
+
+  // 点击页面其他区域时关闭下拉菜单
+  document.addEventListener('click', (e) => {
+    if (!els.exportMenu.contains(e.target)) closeExportMenu();
+  });
 
   /* ============ 总览页：列表渲染 ============ */
 
