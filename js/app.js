@@ -356,9 +356,11 @@
 
   /**
    * 通用导出：优先走系统分享面板，失败则触发浏览器下载
+   * 注意：分享时只传 files，不要附带 title/text；
+   * 否则部分手机系统会把 title/text 额外存成「文字.txt」
    * @param {string} filename 文件名
    * @param {string} content 文件内容
-   * @param {string} mimeType MIME 类型
+   * @param {string} mimeType MIME 类型（需是 Web Share 支持的类型）
    */
   async function shareOrDownload(filename, content, mimeType) {
     const blob = new Blob([content], { type: mimeType });
@@ -367,7 +369,8 @@
       try {
         const file = new File([blob], filename, { type: mimeType });
         if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: filename });
+          // 只分享文件本身，避免系统额外生成文字.txt
+          await navigator.share({ files: [file] });
           showToast('已导出');
           return;
         }
@@ -398,16 +401,17 @@
       await shareOrDownload(
         `书摘导出_${stamp}.csv`,
         '\uFEFF' + buildCsv(list), // 加 BOM，避免 Excel 等工具打开时中文乱码
-        'text/csv;charset=utf-8;'
+        'text/csv'
       );
       return;
     }
 
     if (format === 'markdown') {
+      // 使用 text/plain：Web Share 官方支持该类型；扩展名仍用 .md，Obsidian 可识别
       await shareOrDownload(
         `书摘导出_${stamp}.md`,
         buildMarkdown(list),
-        'text/markdown;charset=utf-8;'
+        'text/plain'
       );
     }
   }
