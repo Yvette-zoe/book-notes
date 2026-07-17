@@ -119,6 +119,12 @@
       return true;
     },
 
+    clear() {
+      const list = this.load();
+      list.splice(0, list.length);
+      this.persist();
+    },
+
     stats() {
       const list = this.load();
       const days = new Set(list.map((e) => dateKeyOf(new Date(e.createdAt))));
@@ -157,6 +163,7 @@
     statTotal: $('#statTotal'),
     statExcerpt: $('#statExcerpt'),
     statThought: $('#statThought'),
+    clearAllBtn: $('#clearAllBtn'),
     exportBtn: $('#exportBtn'),
     exportMenu: $('#exportMenu'),
     exportDropdown: $('#exportDropdown'),
@@ -242,9 +249,23 @@
     els.statTotal.textContent = s.total;
     els.statExcerpt.textContent = s.excerpt;
     els.statThought.textContent = s.thought;
+    els.clearAllBtn.disabled = s.total === 0;
     els.exportBtn.disabled = s.total === 0;
     if (s.total === 0) closeExportMenu();
   }
+
+  els.clearAllBtn.addEventListener('click', () => {
+    if (Store.all().length === 0) return;
+
+    // 清空操作无法撤销，执行前必须由用户再次确认
+    const confirmed = window.confirm('确定要清空全部记录吗？此操作无法撤销。');
+    if (!confirmed) return;
+
+    Store.clear();
+    closeExportMenu();
+    renderOverview();
+    showToast('已清空');
+  });
 
   els.modeSwitch.addEventListener('click', (e) => {
     const btn = e.target.closest('.mode-pill');
